@@ -1,10 +1,21 @@
 import os
 import sys
+import subprocess
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import requests
 import chardet
+
+# Function to ensure all dependencies are installed
+def install_dependencies():
+    required_packages = ["pandas", "seaborn", "matplotlib", "requests", "chardet"]
+    for package in required_packages:
+        try:
+            __import__(package)
+        except ImportError:
+            print(f"Installing {package}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 # Constants
 API_URL = "https://aiproxy.sanand.workers.dev/openai/v1/chat/completions" 
@@ -157,6 +168,7 @@ def main(csv_file):
 
 
 if __name__ == "__main__":
+    install_dependencies()
     if len(sys.argv) != 2:
         print("Usage: python autolysis.py <csv_file>")
         sys.exit(1)

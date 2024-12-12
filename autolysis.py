@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "pandas",
+#     "seaborn",
+#     "matplotlib",
+#     "requests",
+#     "chardet"
+# ]
+# ///
+
 import os
 import sys
 import subprocess

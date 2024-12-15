@@ -99,16 +99,25 @@ def compute_correlation_summary(df):
         return f"Error in computing correlation: {e}"
 
 def visualize_numerical_columns(df):
-    """Visualize numerical columns using pair plots."""
+    """Visualize numerical columns using pair plots (up to the last 6 columns)."""
     numerical_cols = df.select_dtypes(include=['number'])
     if not numerical_cols.empty:
-        plt.figure(figsize=(10, 10), dpi=100)
-        sns.pairplot(numerical_cols)
-        img_path = "numerical_plot.png"
-        plt.savefig(img_path)
-        plt.close()
-        return img_path
+        # Ensure to select up to the last 6 numerical columns
+        limited_numerical_cols = numerical_cols.iloc[:, -6:]
+        if not limited_numerical_cols.empty:
+            plt.figure(figsize=(10, 10), dpi=100)
+            sns.pairplot(limited_numerical_cols)
+            img_path = "numerical_plot.png"
+            plt.savefig(img_path)
+            plt.close()
+            return img_path
+        else:
+            print("No valid numerical columns found for plotting.")
+    else:
+        print("No numerical columns found in the dataset.")
     return ""
+
+
 
 def visualize_categorical_columns(df):
     """Visualize categorical columns using bar plots."""
@@ -156,12 +165,12 @@ def main(csv_file):
         readme.write(f"## Correlation Matrix\n{summary_4}\n\n")
 
         # Numerical Visualization
-        img_path_5 = execute_with_timeout(visualize_numerical_columns, 60, df)
+        img_path_5 = execute_with_timeout(visualize_numerical_columns, 30, df)
         if img_path_5:
             readme.write(f"## Numerical Visualization\n![Numerical Plot]({img_path_5})\n\n")
 
         # Categorical Visualization
-        img_path_6 = execute_with_timeout(visualize_categorical_columns, 60, df)
+        img_path_6 = execute_with_timeout(visualize_categorical_columns, 30, df)
         if img_path_6:
             readme.write(f"## Categorical Visualization\n![Categorical Plot]({img_path_6})\n\n")
 

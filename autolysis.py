@@ -5,7 +5,7 @@
 #     "seaborn",
 #     "matplotlib",
 #     "requests",
-#     "chardet"
+#     "chardet" 
 # ]
 # ///
 
@@ -17,6 +17,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import requests
 import chardet
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 # Function to ensure all dependencies are installed
 def install_dependencies():
@@ -51,6 +52,16 @@ def send_to_openai(prompt, detail="default"):
     )
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
+
+def execute_with_timeout(func, timeout, *args, **kwargs):
+    """Execute a function with a timeout."""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            print(f"Function '{func.__name__}' exceeded the timeout of {timeout} seconds.")
+            return ""  # Return empty string if timeout occurs
 
 def summarize_data_overview(df):
     info = df.info(buf=None)
@@ -91,43 +102,29 @@ def visualize_numerical_columns(df):
     """Visualize numerical columns using pair plots."""
     numerical_cols = df.select_dtypes(include=['number'])
     if not numerical_cols.empty:
-        # Ensure there are valid numerical columns with non-NaN values
-        valid_cols = numerical_cols.dropna(axis=1, how='all')
-        if not valid_cols.empty:
-            plt.figure(figsize=(10, 10), dpi=100)
-            sns.pairplot(valid_cols)
-            img_path = "numerical_plot.png"
-            plt.savefig(img_path)
-            plt.close()
-            print(f"Numerical columns visualization saved as {img_path}.")
-            return img_path
-        else:
-            print("No valid numerical columns with data found for visualization.")
-    else:
-        print("No numerical columns found for visualization.")
-
+        plt.figure(figsize=(10, 10), dpi=100)
+        sns.pairplot(numerical_cols)
+        img_path = "numerical_plot.png"
+        plt.savefig(img_path)
+        plt.close()
+        return img_path
+    return ""
 
 def visualize_categorical_columns(df):
     """Visualize categorical columns using bar plots."""
     categorical_cols = df.select_dtypes(include=['object', 'category'])
     if not categorical_cols.empty:
         for col in categorical_cols.columns:
-            unique_values_count = df[col].nunique()  # Count unique values in the column
+            unique_values_count = df[col].nunique()
             if unique_values_count > 30:
-                print(f"Skipping {col} as it has {unique_values_count} unique values.")
-                continue  # Skip columns with more than 20 unique values
-            
-            # Proceed to plot if unique values are <= 20
+                continue
             plt.figure(figsize=(8, 8), dpi=100)
             sns.countplot(y=col, data=df, order=df[col].value_counts().index)
             img_path = f"{col}_plot.png"
-            plt.title(f"Distribution of {col}")
             plt.savefig(img_path)
             plt.close()
             return img_path
-    else:
-        print("No categorical columns found for visualization.")
-
+    return ""
 
 def main(csv_file):
     with open(csv_file, 'rb') as f:
@@ -135,48 +132,43 @@ def main(csv_file):
         encoding = result['encoding']
 
     df = pd.read_csv(csv_file, encoding=encoding)
-    all_summaries = []  # To accumulate all summaries for final context
+    all_summaries = []
 
     with open("README.md", "w") as readme:
         readme.write("# Automated Data Analysis\n\n")
 
         # Data Overview
-        summary_1 = summarize_data_overview(df)
+        summary_1 = execute_with_timeout(summarize_data_overview, 60, df)
         all_summaries.append(f"## Data Overview\n{summary_1}")
         readme.write(f"## Data Overview\n{summary_1}\n\n")
 
         # Clean Data
-        df = clean_missing_data(df)
+        df = execute_with_timeout(clean_missing_data, 60, df)
 
         # Outlier Detection
-        summary_3 = detect_outliers_and_anomalies(df)
+        summary_3 = execute_with_timeout(detect_outliers_and_anomalies, 60, df)
         all_summaries.append(f"## Outlier Detection\n{summary_3}")
         readme.write(f"## Outlier Detection\n{summary_3}\n\n")
 
         # Correlation Analysis
-        summary_4 = compute_correlation_summary(df)
+        summary_4 = execute_with_timeout(compute_correlation_summary, 60, df)
         all_summaries.append(f"## Correlation Matrix\n{summary_4}")
         readme.write(f"## Correlation Matrix\n{summary_4}\n\n")
 
         # Numerical Visualization
-        img_path_5 = visualize_numerical_columns(df)
+        img_path_5 = execute_with_timeout(visualize_numerical_columns, 60, df)
         if img_path_5:
-            numerical_summary = f"Numerical data has been visualized. The plot is saved as {img_path_5}."
-            all_summaries.append(numerical_summary)
             readme.write(f"## Numerical Visualization\n![Numerical Plot]({img_path_5})\n\n")
 
         # Categorical Visualization
-        img_path_6 = visualize_categorical_columns(df)
+        img_path_6 = execute_with_timeout(visualize_categorical_columns, 60, df)
         if img_path_6:
-            categorical_summary = f"Categorical data has been visualized. The plot is saved as {img_path_6}."
-            all_summaries.append(categorical_summary)
             readme.write(f"## Categorical Visualization\n![Categorical Plot]({img_path_6})\n\n")
 
         # Final Story Generation
         full_context = "\n\n".join(all_summaries)
-        final_story = send_to_openai(f"Here is the complete analysis:\n\n{full_context}\n\nSummarize this analysis into a cohesive story.")
-        readme.write(f"## Final Story\n{final_story}\n\n## Numerical Visualization\n![Numerical Plot]({img_path_5})\n\n## Categorical Visualization\n![Categorical Plot]({img_path_6})\n\n")
-
+        final_story = execute_with_timeout(send_to_openai, 60, f"Here is the complete analysis:\n\n{full_context}")
+        readme.write(f"## Final Story\n{final_story}\n\n")
 
 if __name__ == "__main__":
     install_dependencies()
